@@ -40,7 +40,7 @@ static inline double tv_to_double(struct timeval tv)
 // LOG TABLE IMPLEMENTATION
 /////////////////////////////////////////////////////////////////
 
-bLSM::bLSM(int log_mode, pageid_t max_c0_size, pageid_t internal_region_size, pageid_t datapage_region_size, pageid_t datapage_size)
+bLSM::bLSM(int log_mode, pageid_t max_c0_size, pageid_t internal_region_size, pageid_t datapage_region_size, pageid_t datapage_size, const char *path)
 {
     recovering = true;
     this->max_c0_size = max_c0_size;
@@ -80,7 +80,14 @@ bLSM::bLSM(int log_mode, pageid_t max_c0_size, pageid_t internal_region_size, pa
 
     this->log_mode = log_mode;
     this->batch_size = 0;
-    log_file = stasis_log_file_pool_open("lsm_log",
+    std::string log_dir(path);
+    if (log_dir.length() != 0) {
+      if (log_dir[log_dir.length()-1] != '/')
+        log_dir += "/";
+    }
+    log_dir += "lsm_log";
+    //log_file = stasis_log_file_pool_open("lsm_log",
+    log_file = stasis_log_file_pool_open(log_dir.c_str(),
     									 stasis_log_file_mode,
     									 stasis_log_file_permissions);
 }
