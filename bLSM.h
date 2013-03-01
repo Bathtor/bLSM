@@ -20,6 +20,7 @@
 #define _LOGSTORE_H_
 
 #include <stasis/common.h>
+#include <stasis/logger/logger2.h>
 
 #include <vector>
 
@@ -33,6 +34,9 @@ class bLSM {
 public:
 
   class iterator;
+    
+    static std::string log_path;
+    static stasis_log_t* stasis_log_path_factory();
 
   // We want datapages to be as small as possible, assuming they don't force an extra seek to traverse the bottom level of internal nodes.
   // Internal b-tree mem requirements:
@@ -76,7 +80,8 @@ public:
     void replayLog();
     void logUpdate(dataTuple * tup);
 
-    static void init_stasis();
+    //static void init_stasis();
+    static void init_stasis(const char *path="");
     static void deinit_stasis();
 
     inline uint64_t get_epoch() { return epoch; }

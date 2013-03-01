@@ -19,12 +19,14 @@
 #include "bLSM.h"
 #include "mergeScheduler.h"
 
+#include <stasis/flags.h>
 #include <stasis/transactional.h>
 #include <stasis/bufferManager.h>
 #include <stasis/bufferManager/bufferHash.h>
-#include <stasis/logger/logger2.h>
 #include <stasis/logger/logHandle.h>
 #include <stasis/logger/filePool.h>
+#include <stasis/logger/safeWrites.h>
+#include <stasis/logger/inMemoryLog.h>
 #include "mergeStats.h"
 
 // Backpressure reads to avoid merge starvation?  Experimental/short-term hack
@@ -117,12 +119,75 @@ bLSM::~bLSM()
     delete tmerger;
 }
 
-void bLSM::init_stasis() {
+//void bLSM::init_stasis() {
+//
+//  dataPage::register_stasis_page_impl();
+////  stasis_buffer_manager_hint_writes_are_sequential = 1;
+//  Tinit();
+//
+//}
 
-  dataPage::register_stasis_page_impl();
-//  stasis_buffer_manager_hint_writes_are_sequential = 1;
-  Tinit();
+std::string bLSM::log_path = "";
 
+stasis_log_t* bLSM::stasis_log_path_factory() {
+    std::string logdir(stasis_log_dir_name);
+    std::string logfile(stasis_log_file_name);
+    
+    std::string logdirpath = bLSM::log_path+logdir;
+    std::string logfilepath = bLSM::log_path+logfile;
+    
+    //printf("Log Dir Path: %s \n", logdirpath.c_str());
+    //printf("Log File Path: %s \n", logdirpath.c_str());
+    
+    char *ldp = (char*)malloc(sizeof(char)*logdirpath.size());
+    strcpy(ldp, logdirpath.c_str());
+    
+    char *lfp = (char*)malloc(sizeof(char)*logfilepath.size());
+    strcpy(lfp, logfilepath.c_str());
+
+    
+    stasis_log_t *log_file = 0;
+    if(LOG_TO_DIR  == stasis_log_type) {
+        log_file = stasis_log_file_pool_open(ldp,
+                                             stasis_log_file_mode,
+                                             stasis_log_file_permissions);
+    } else if(LOG_TO_FILE == stasis_log_type) {
+        log_file = stasis_log_safe_writes_open(lfp,
+                                               stasis_log_file_mode,
+                                               stasis_log_file_permissions,
+                                               stasis_log_softcommit);
+        log_file->group_force =
+        stasis_log_group_force_init(log_file, 10 * 1000 * 1000); // timeout in nsec; want 10msec.
+    }
+//    } else if(LOG_TO_MEMORY == stasis_log_type) {
+//        log_file = stasis_log_impl_in_memory_open();
+//        log_file->group_force = 0;
+//    }
+    return log_file;
+}
+
+void bLSM::init_stasis(const char *path) {
+    dataPage::register_stasis_page_impl();
+    //  stasis_buffer_manager_hint_writes_are_sequential = 1;
+    
+    std::string pathstr(path);
+    if (pathstr.length() != 0) {
+        if (pathstr[pathstr.length()-1] != '/')
+            pathstr += "/";
+    }
+    bLSM::log_path = pathstr;
+    
+    std::string storefilepath = pathstr+"storefile.txt";
+    
+    char *ssfn = (char*)malloc(sizeof(char)*storefilepath.size());
+    strcpy(ssfn, storefilepath.c_str());
+    stasis_store_file_name = ssfn;
+    //printf("Store file: %s \n", stasis_store_file_name);
+    stasis_log_factory = bLSM::stasis_log_path_factory;
+    
+    printf("Ignoring path: %s \n", path);
+    
+    Tinit();
 }
 
 void bLSM::deinit_stasis() { Tdeinit(); }
